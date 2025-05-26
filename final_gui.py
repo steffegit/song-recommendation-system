@@ -259,11 +259,11 @@ def train_models():
         )
         return
 
-    als_iters = 30
+    als_iters = 20  # era 30 inainte
     als_tolerance = 1e-4
     nnls_iters = 50
     nnls_tolerance = 1e-5
-    nnls_lr = 1e-4
+    nnls_lr = 1e-3  # era 1e-4 inainte
 
     error_mult.clear()
     error_sklearn.clear()
@@ -391,6 +391,15 @@ class RecApp:
             command=lambda: self.show_recommendations("als_manual"),
         )
         self.btn_als_manual.pack(side=tk.LEFT, expand=True, padx=2)
+
+        # Buton pentru afișarea graficului erorii
+        self.btn_show_plot = tk.Button(
+            self.root,
+            text="Afișează graficul erorii",
+            font=("Arial", 11),
+            command=self.plot_loss_curves,
+        )
+        self.btn_show_plot.pack(pady=(0, 10))
 
         # Label pentru referinta si tabel pentru recomandari
         self.reference_frame = tk.Frame(self.root)
