@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.decomposition import NMF as SKNMF
 import random
 
 # Load data and build track × tag matrix
@@ -43,17 +44,27 @@ def nmf_multiplicative(V, r, max_iter=100, tol=1e-4):
         if it > 0:
             error = np.linalg.norm(V - W @ H, "fro")
             if it % 10 == 0:
-                print(f"Iteration {it}: error = {error:.4f}")
+                print(f"Multiplicative NMF Iteration {it}: error = {error:.4f}")
             if error < tol:
-                print(f"Converged at iteration {it}")
+                print(f"Multiplicative NMF converged at iteration {it}")
                 break
 
     return W, H
 
 
-# Run NMF
-r = 10
-W, H = nmf_multiplicative(track_tag_matrix, r)
+def nmf_sklearn(V, r, max_iter=100, tol=1e-4):
+    model = SKNMF(
+        n_components=r,
+        init="random",
+        random_state=42,
+        max_iter=max_iter,
+        tol=tol,
+        solver="cd",
+    )
+    W = model.fit_transform(V)
+    H = model.components_
+    print(f"sklearn NMF: final error = {np.linalg.norm(V - W @ H, 'fro'):.4f}")
+    return W, H
 
 
 def get_recommendations(idx, similarity_matrix, method_name, top_n=5):
@@ -69,15 +80,31 @@ def get_recommendations(idx, similarity_matrix, method_name, top_n=5):
         print(f"- {df.iloc[i]['name']} - {df.iloc[i]['artist']}")
 
 
-# Main recommendation loop
-while True:
-    idx = random.randint(0, len(df) - 1)
+def main():
+    r = 10
 
-    # Tag-based recommendations
-    get_recommendations(idx, track_tag_matrix, "tag similarity")
+    # Multiplicative NMF
+    W, H = nmf_multiplicative(track_tag_matrix, r)
+    print("Multiplicative NMF error:", np.linalg.norm(track_tag_matrix - W @ H, "fro"))
 
-    # NMF-based recommendations
-    get_recommendations(idx, W, "NMF latent factors")
+    # sklearn NMF
+    W_sklearn, H_sklearn = nmf_sklearn(track_tag_matrix, r)
+    print(
+        "sklearn NMF error:",
+        np.linalg.norm(track_tag_matrix - W_sklearn @ H_sklearn, "fro"),
+    )
 
-    if input("\nPress Enter to continue (or 'q' to quit): ").lower() == "q":
-        break
+    # Main recommendation loop
+    while True:
+        idx = random.randint(0, len(df) - 1)
+
+        get_recommendations(idx, track_tag_matrix, "tag similarity")
+        get_recommendations(idx, W, "NMF multiplicative")
+        get_recommendations(idx, W_sklearn, "NMF (sklearn)")
+
+        if input("\nPress Enter to continue (or 'q' to quit): ").lower() == "q":
+            break
+
+
+if __name__ == "__main__":
+    main()

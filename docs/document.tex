@@ -1,0 +1,125 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Sistem de recomandare folosind factorizare de matrice (NMF) și similaritate pe taguri}
+\author{Gatej Stefan-Alexandru, Potop Horia-Ioan}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\section{Descrierea aplicației}
+	
+	Scopul acestei componente este de a recomanda melodii similare pe baza tagurilor asociate fiecărei piese muzicale. Problema se modelează ca o problemă de optimizare cu constrângeri: factorizarea non-negativă a unei matrice binare (melodie $\times$ tag).
+	
+	\section{Formularea matematică a problemei}
+	
+	Fie $V \in \mathbb{R}^{m \times n}$ matricea binară ce indică asocierea dintre $m$ melodii și $n$ taguri. Dorim să găsim două matrice $W \in \mathbb{R}^{m \times r}$ și $H \in \mathbb{R}^{r \times n}$, cu $W \geq 0$, $H \geq 0$, astfel încât:
+	
+	\begin{equation}
+		\min_{W \geq 0, H \geq 0} \| V - W H \|_F^2
+	\end{equation}
+	
+	\textbf{Constrângeri:}
+	\begin{itemize}
+		\item $W_{ij} \geq 0$
+		\item $H_{ij} \geq 0$
+	\end{itemize}
+	
+	\subsection*{Concepte cheie: Profil latent și Cluster latent}
+	
+	\paragraph{Profil latent}
+	Un profil latent este o reprezentare numerică, invizibilă direct, a unei entități (de exemplu, o melodie sau un utilizator) într-un spațiu de factori ascunși (latenti). Acești factori nu sunt direct observați în datele inițiale (cum ar fi tagurile sau genurile), ci sunt descoperiți automat de algoritmul de factorizare (NMF). Fiecare melodie va avea un vector de factori latenti (profil latent), de exemplu: $[0.2, 1.5, 0.0, 0.7, ...]$. Acești factori pot corespunde unor teme, stiluri sau combinații de caracteristici pe care algoritmul le-a identificat ca fiind relevante, dar care nu au neapărat o interpretare clară.
+	
+	\paragraph{Cluster latent}
+	Un cluster latent este un grup de entități (melodii, utilizatori etc.) care au profiluri latente similare, adică sunt apropiate în spațiul factorilor latenti. Acest cluster poate corespunde, de exemplu, unui anumit gen muzical, unui anumit artist sau unui tipar de preferințe pe care algoritmul l-a descoperit, chiar dacă nu există un tag explicit pentru acel grup.
+	
+	\vspace{0.5em}
+	\textit{Pe scurt: Profilul latent este vectorul de factori ascunși care descrie o melodie/utilizator, iar un cluster latent este un grup de melodii/utilizatori cu profiluri latente similare.}
+	\vspace{1em} % Adaugă un spațiu vertical mai mare după explicație
+	
+	\section{Soluția implementată}
+	
+	Am implementat două metode pentru rezolvarea problemei:
+	
+	\subsection{Algoritmul multiplicativ pentru NMF}
+	
+	\begin{itemize}
+		\item Algoritm iterativ ce actualizează alternativ $W$ și $H$ folosind reguli multiplicative.
+		\item Rapid și eficient pentru matrice mari.
+	\end{itemize}
+	
+	\subsection{NMF din scikit-learn (\texttt{sklearn.decomposition.NMF})}
+	
+	\begin{itemize}
+		\item Implementare optimizată ce folosește coordinate descent.
+		\item Oferă rezultate robuste și convergență rapidă.
+	\end{itemize}
+	
+	\subsection*{Fragment de cod}
+	
+	\begin{verbatim}
+		def nmf_multiplicative(V, r, max_iter=100, tol=1e-4):
+		m, n = V.shape
+		np.random.seed(42)
+		W = np.abs(np.random.randn(m, r))
+		H = np.abs(np.random.randn(r, n))
+		for it in range(max_iter):
+		H *= (W.T @ V) / (W.T @ (W @ H) + 1e-10)
+		W *= (V @ H.T) / ((W @ H) @ H.T + 1e-10)
+		return W, H
+		
+		from sklearn.decomposition import NMF
+		model = NMF(n_components=10, init='random', random_state=42, max_iter=100)
+		W_sklearn = model.fit_transform(track_tag_matrix)
+		H_sklearn = model.components_
+	\end{verbatim}
+	
+	\section{Rezultate numerice și concluzii}
+	
+	\subsection{Erori de reconstrucție}
+	
+	\begin{itemize}
+		\item \textbf{Multiplicative NMF:} 337.03
+		\item \textbf{sklearn NMF:} 336.42
+	\end{itemize}
+	
+	\subsection{Recomandări generate}
+	
+	\begin{itemize}
+		\item \textbf{Tag similarity:} Recomandă melodii cu taguri identice/similare.
+		\item \textbf{NMF multiplicativă:} Recomandă melodii cu profil latent apropiat, nu neapărat cu aceleași taguri.
+		\item \textbf{NMF (sklearn):} Recomandă melodii din același cluster latent (ex: toate piesele unui artist).
+	\end{itemize}
+	
+	\subsection{Timp de execuție}
+	
+	Algoritmul multiplicativ și sklearn NMF rulează rapid (câteva secunde pentru setul de date testat).
+	
+	\subsection{Concluzii}
+	
+	\begin{itemize}
+		\item Ambele metode de NMF oferă rezultate similare ca eroare de reconstrucție.
+		\item NMF descoperă similarități latente între melodii, nu doar pe baza tagurilor explicite.
+		\item Recomandările pe factori latenti pot fi mai relevante pentru utilizator decât cele bazate strict pe taguri.
+	\end{itemize}
+	
+	\section{Comparare cu alte funcții Python}
+	
+	Pentru această problemă, funcțiile \texttt{scipy.optimize.minimize} nu sunt potrivite direct, deoarece nu pot gestiona eficient constrângeri de non-negativitate pe matrice mari (ar fi fost extrem de lent). NMF din \texttt{sklearn} este optimizată pentru această clasă de probleme și oferă rezultate competitive cu algoritmul multiplicativ clasic.
+	
+	\section{Bibliografie}
+	
+	\begin{itemize}
+		\item Lee, D. D., \& Seung, H. S. (2001). Algorithms for non-negative matrix factorization. Advances in neural information processing systems, 13.
+		\item \url{https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.NMF.html}
+		\item \url{https://en.wikipedia.org/wiki/Non-negative_matrix_factorization}
+	\end{itemize}
+	
+\end{document}
