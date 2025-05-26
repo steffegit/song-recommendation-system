@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import NMF as SKNMF
 import random
+import matplotlib.pyplot as plt
+from sklearn.metrics import explained_variance_score, mean_squared_error
 
 
 # -----------------------------------------------------------------------------
@@ -54,6 +56,7 @@ def als_manual_nnls(
     tol_nnls=1e-5,
     lr_nnls=None,
     random_state=None,
+    error_list=None,
 ):
     if random_state is not None:
         np.random.seed(random_state)
@@ -93,6 +96,8 @@ def als_manual_nnls(
                     )
 
         current_error_als = np.linalg.norm(V - W @ H, "fro")
+        if error_list is not None:
+            error_list.append(current_error_als)
         if iteration_als % 5 == 0 or iteration_als == max_iter_als - 1:
             print(
                 f"ALS-NNLS Iteration {iteration_als}: Frobenius error = {current_error_als:.4f}"
@@ -118,7 +123,7 @@ def als_manual_nnls(
 # -----------------------------------------------------------------------------
 # Multiplicative NMF
 # -----------------------------------------------------------------------------
-def nmf_multiplicative(V, r, max_iter=100, tol=1e-4):
+def nmf_multiplicative(V, r, max_iter=100, tol=1e-4, error_list=None):
     m, n = V.shape
     if r == 0:
         return np.zeros((m, 0)), np.zeros((0, n))
@@ -139,20 +144,21 @@ def nmf_multiplicative(V, r, max_iter=100, tol=1e-4):
         W_denominator = WH @ H.T + 1e-10
         W *= W_numerator / W_denominator
 
-        if it > 0:
-            error = np.linalg.norm(V - W @ H, "fro")
-            if it % 10 == 0:
-                print(f"Multiplicative NMF Iteration {it}: error = {error:.4f}")
-            if error < tol:
-                print(f"Multiplicative NMF converged at iteration {it}")
-                break
+        error = np.linalg.norm(V - W @ H, "fro")
+        if error_list is not None:
+            error_list.append(error)
+        if it % 10 == 0:
+            print(f"Multiplicative NMF Iteration {it}: error = {error:.4f}")
+        if error < tol:
+            print(f"Multiplicative NMF converged at iteration {it}")
+            break
     return W, H
 
 
 # -----------------------------------------------------------------------------
 # NMF din sklearn
 # -----------------------------------------------------------------------------
-def nmf_sklearn(V, r, max_iter=100, tol=1e-4):
+def nmf_sklearn(V, r, max_iter=100, tol=1e-4, error_list=None):
     if r == 0:
         return np.zeros((V.shape[0], 0)), np.zeros((0, V.shape[1]))
     model = SKNMF(
@@ -165,6 +171,9 @@ def nmf_sklearn(V, r, max_iter=100, tol=1e-4):
     )
     W = model.fit_transform(V)
     H = model.components_
+    if error_list is not None:
+        # sklearn NMF does not expose per-iteration error, so just append final error
+        error_list.append(np.linalg.norm(V - W @ H, "fro"))
     print(f"sklearn NMF: final error = {np.linalg.norm(V - W @ H, 'fro'):.4f}")
     return W, H
 
@@ -226,11 +235,19 @@ def main():
     nnls_tolerance = 1e-5
     nnls_lr = 1e-4  # Adjust if NNLS manual does not converge well
 
+    error_mult = []
+    error_sklearn = []
+    error_als = []
+
     print("\n--- Starting Multiplicative NMF ---")
-    W_mult, H_mult = nmf_multiplicative(track_tag_matrix, r_factor)
+    W_mult, H_mult = nmf_multiplicative(
+        track_tag_matrix, r_factor, error_list=error_mult
+    )
 
     print("\n--- Starting sklearn NMF ---")
-    W_sklearn, H_sklearn = nmf_sklearn(track_tag_matrix, r_factor)
+    W_sklearn, H_sklearn = nmf_sklearn(
+        track_tag_matrix, r_factor, error_list=error_sklearn
+    )
 
     print("\n--- Starting ALS with Manual NNLS ---")
     W_als_manual, H_als_manual = als_manual_nnls(
@@ -242,7 +259,41 @@ def main():
         tol_nnls=nnls_tolerance,
         lr_nnls=nnls_lr,
         random_state=42,
+        error_list=error_als,
     )
+
+    print(
+        "Explained variance (ALS-NNLS):",
+        explained_variance_score(
+            track_tag_matrix.flatten(), (W_als_manual @ H_als_manual).flatten()
+        ),
+    )
+    print(
+        "MSE (ALS-NNLS):",
+        mean_squared_error(
+            track_tag_matrix.flatten(), (W_als_manual @ H_als_manual).flatten()
+        ),
+    )
+
+    # Plot loss curves
+    plt.figure(figsize=(10, 6))
+    if error_mult:
+        plt.plot(error_mult, label="Multiplicative NMF")
+    if error_als:
+        plt.plot(error_als, label="ALS (Manual NNLS)")
+    if error_sklearn:
+        plt.plot(
+            [None] * (len(error_mult) - 1) + error_sklearn,
+            "o",
+            label="NMF (sklearn) final",
+        )
+    plt.xlabel("Iteration")
+    plt.ylabel("Frobenius Loss")
+    plt.title("Evoluția erorii pentru diferite metode NMF")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
     print("\n--- Starting Recommendation Loop ---")
     while True:

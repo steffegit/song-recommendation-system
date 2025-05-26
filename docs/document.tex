@@ -157,53 +157,113 @@ Pentru un număr de factori latenti $r=10$, erorile de reconstrucție (norma Fro
 Se observă că implementarea din \texttt{sklearn} obține o eroare de reconstrucție puțin mai mică, probabil datorită optimizărilor interne și a robusteții solver-ului Coordinate Descent. Algoritmul multiplicativ obține rezultate comparabile. Implementarea ALS-NNLS manuală prezintă o eroare semnificativ mai mare, indicând posibile probleme de convergență în subproblemele NNLS manuale, în special legate de alegerea ratei de învățare și a numărului de iterații pentru solver-ul de proiectare a gradientului.
 
 \subsection{Recomandări generate (Exemplu)}
-% ... (secțiunea de recomandări rămâne similară, asigură-te că ai exemple și pentru ALS) ...
-Pentru piesa de referință "Opening - Linkin Park":
-\begin{itemize}
-\item \textbf{Tag similarity (Baseline):}
-\begin{itemize}
-\item Celestial - P.O.D.
-\item Arto - System of a Down
-\item Session - Linkin Park
-\end{itemize}
-\item \textbf{NMF Multiplicativă:}
-\begin{itemize}
-\item What Love - Moby
-\item Lucky You - Deftones
-\item Krwlng - Linkin Park
-\end{itemize}
-\item \textbf{NMF (sklearn):}
-\begin{itemize}
-\item What Love - Moby
-\item City on a Hill - Genghis Tron
-\item Wish - Nine Inch Nails
-\end{itemize}
-\item \textbf{ALS (NNLS Manual):} 
-% TODO: Rulează codul și adaugă exemple de recomandări pentru ALS
-% Dacă eroarea e mare, recomandările pot fi mai puțin relevante.
-\begin{itemize}
-\item [Exemplu melodie ALS 1 - posibil mai puțin relevantă din cauza erorii]
-\item [Exemplu melodie ALS 2]
-\item [Exemplu melodie ALS 3]
-\end{itemize}
-\end{itemize}
-Recomandările bazate pe factorizare (NMF, ALS) tind să identifice similarități latente. Calitatea recomandărilor ALS-NNLS este direct influențată de performanța sa în minimizarea erorii de reconstrucție.
+\label{subsec:recomandari_exemplu}
 
-\subsection{Timp de execuție (Observații calitative)}
-% ... (rămâne la fel) ...
+Pentru a ilustra tipurile de recomandări generate de fiecare metodă, am selectat piesa de referință \textbf{"Murder One" de Metallica}. Această piesă este un tribut adus lui Lemmy Kilmister de la Motörhead și se încadrează în genul Thrash Metal/Heavy Metal. Mai jos sunt prezentate top 5 recomandări pentru fiecare abordare implementată:
+
 \begin{itemize}
-\item \textbf{NMF (sklearn):} Cel mai rapid, datorită implementării optimizate.
-\item \textbf{NMF Multiplicativ (Manual):} Relativ rapid, dar poate necesita mai multe iterații pentru convergență fină.
-\item \textbf{ALS (NNLS Manual):} Cel mai lent, deoarece fiecare iterație ALS implică multiple rezolvări ale subproblemelor NNLS, care sunt ele însele iterative și implementate manual. Timpul este sensibil la numărul de iterații și rata de învățare alese pentru NNLS.
+	\item \textbf{Referință: Murder One - Metallica}
+	\begin{itemize}
+		\item \textit{Recomandări (Tag Similarity - Similaritate Cosinus pe taguri):}
+		\begin{itemize}
+			\item Necrophiliac - Slayer
+			\item Blacklist - Exodus
+			\item Electric Crown - Testament
+			\item Murder Fantasies - Kreator
+			\item Practice What You Preach - Testament
+		\end{itemize}
+		\vspace{0.5em} % Spațiu mic între metode
+		\item \textit{Recomandări (NMF Multiplicativ Manual):}
+		\begin{itemize}
+			\item Crionics - Slayer
+			\item Praise of Death - Slayer
+			\item Blackmail The Universe - Megadeth
+			\item Washington Is Next! - Megadeth
+			\item Back In the Day - Megadeth
+		\end{itemize}
+		\vspace{0.5em}
+		\item \textit{Recomandări (NMF \texttt{sklearn}, solver 'cd'):}
+		\begin{itemize}
+			\item Blacklist - Exodus
+			\item At Dawn They Sleep - Slayer
+			\item Bite The Hand - Megadeth
+			\item Uplift - Pantera
+			\item Praise of Death - Slayer
+		\end{itemize}
+		\vspace{0.5em}
+		\item \textit{Recomandări (ALS cu NNLS Manual):}
+		\begin{itemize}
+			\item Practice What You Preach - Testament
+			\item Bite The Hand - Megadeth
+			\item Hy Pro Glo - Anthrax
+			\item Deviance - Slayer
+			\item Tormentor - Slayer
+		\end{itemize}
+	\end{itemize}
+\end{itemize}
+
+\paragraph{Observații asupra exemplului:}
+Se poate observa că toate metodele tind să recomande piese din subgenuri similare ale metalului (Thrash, Speed, Heavy Metal), ceea ce este de așteptat.
+\begin{itemize}
+	\item \textbf{Similaritatea pe taguri} pare să identifice corect piese cu tematici sau stiluri lirice/muzicale apropiate, menționate explicit în taguri (ex: Kreator - Murder Fantasies).
+	\item \textbf{Metodele NMF} (atât manuală, cât și \texttt{sklearn}) și \textbf{ALS} generează recomandări care, deși tot din sfera metal, pot proveni de la artiști diferiți, indicând descoperirea unor profiluri latente comune. De exemplu, prezența consistentă a pieselor de la Slayer și Megadeth în recomandările NMF și ALS sugerează că aceste trupe partajează caracteristici latente similare cu Metallica în contextul datelor analizate.
+	\item Diferențele subtile între recomandările NMF și ALS pot fi atribuite modului diferit în care algoritmii converg și ponderează factorii latenti, precum și performanței de reconstrucție a fiecărei metode.
+\end{itemize}
+\paragraph{}{Acest exemplu ilustrează capacitatea metodelor de factorizare de a merge dincolo de potrivirile directe de taguri și de a sugera melodii relevante pe baza unor similarități structurale mai profunde.}
+\paragraph{}{Recomandările bazate pe factorizare (NMF, ALS) tind să identifice similarități latente. Calitatea recomandărilor ALS-NNLS este direct influențată de performanța sa în minimizarea erorii de reconstrucție.}
+
+\subsection{Analiza convergenței și a erorilor de reconstrucție}
+\label{subsec:convergenta-erori} % Am schimbat _ cu - în label
+
+Performanța algoritmilor de factorizare este adesea evaluată prin eroarea de reconstrucție și prin modul în care aceasta evoluează pe parcursul iterațiilor.
+
+\paragraph{NMF Multiplicativ (Manual):}
+După cum se observă din log-ul de execuție, algoritmul NMF multiplicativ prezintă o scădere monotonă a erorii de reconstrucție pe măsură ce numărul de iterații crește:
+\begin{verbatim}
+	Multiplicative NMF Iteration 0: error = 403.9834
+	Multiplicative NMF Iteration 10: error = 350.3428
+	...
+	Multiplicative NMF Iteration 90: error = 337.0462
+\end{verbatim}
+Eroarea finală raportată a fost de \textbf{337.03}. Această convergență graduală este caracteristică regulilor de update multiplicative.
+
+\paragraph{NMF (\texttt{sklearn}, solver 'cd'):}
+Implementarea din \texttt{sklearn} cu solver-ul Coordinate Descent a raportat direct o eroare finală de reconstrucție de \textbf{336.42}. Acest solver este adesea mai rapid în a atinge un minim local bun datorită optimizărilor sale.
+
+\paragraph{ALS cu NNLS Manual (ALS-NNLS):}
+Pentru implementarea ALS cu subprobleme NNLS rezolvate manual, s-a observat următorul comportament:
+\begin{verbatim}
+	ALS-NNLS Iteration 0: Frobenius error = 426.8031
+	ALS-NNLS Iteration 5: Frobenius error = 430.4727
+	ALS-NNLS converged at iteration 8.
+\end{verbatim}
+Eroarea finală de reconstrucție raportată a fost de aproximativ \textbf{430.48}. Se observă că eroarea inițială este mai mare comparativ cu NMF și, în mod interesant, eroarea a crescut ușor între iterația 0 și iterația 5, înainte de a se stabiliza și a algoritmului să conveargă la iterația 8. Această creștere temporară a erorii poate apărea în ALS dacă subproblemele NNLS nu sunt rezolvate cu suficientă precizie la fiecare pas, sau dacă rata de învățare aleasă pentru NNLS manual (\texttt{lr\_nnls = 1e-4}) și numărul de iterații interne NNLS (\texttt{nnls\_iters = 50}) nu sunt optimi pentru toate subproblemele întâlnite.
+
+Este important de menționat că parametrii pentru ALS-NNLS manual (precum \texttt{als\_iters = 30}, \texttt{nnls\_iters = 50}, \texttt{lr\_nnls = 1e-4}) au fost aleși pentru a obține un echilibru între calitatea soluției și timpul de execuție, în special având în vedere natura computațional intensivă a rezolvării manuale a multiplelor subprobleme NNLS. O explorare mai exhaustivă a spațiului de hiperparametri pentru \texttt{lr\_nnls} și \texttt{nnls\_iters} ar putea duce la o eroare de reconstrucție mai mică pentru ALS-NNLS, dar ar crește semnificativ timpul de rulare. Valoarea de "Explained variance" raportată pentru ALS-NNLS este foarte mică, ceea ce este consistent cu o eroare de reconstrucție mare și sugerează că modelul, în configurația actuală, nu a reușit să captureze la fel de bine structura datelor ca metodele NMF.
+
+\subsection{Erori de reconstrucție (Sumar)} 
+Pentru un număr de factori latenti $r=10$, erorile de reconstrucție (norma Frobenius $\|V - WH\|_F$) obținute au fost:
+\begin{itemize}
+	\item \textbf{NMF Multiplicativ (Manual):} 337.03
+	\item \textbf{NMF (\texttt{sklearn}, solver 'cd'):} 336.42
+	\item \textbf{ALS (NNLS Manual):} 430.48
+\end{itemize}
+
+% ... (secțiunea \subsection{Recomandări generate (Exemplu)} rămâne la fel, presupunând că numele pieselor nu conțin underscore problematic) ...
+% Dacă numele pieselor conțin underscore, trebuie escapate: Metallica\_MasterOfPuppets -> Metallica\textunderscore MasterOfPuppets
+
+\subsection{Timp de execuție și Complexitate Computațională} 
+\begin{itemize}
+	\item \textbf{NMF (\texttt{sklearn}):} Cel mai rapid, datorită implementării optimizate în C și a eficienței algoritmului Coordinate Descent.
+	\item \textbf{NMF Multiplicativ (Manual):} Relativ rapid. Fiecare iterație implică operații matriciale, dar nu rezolvarea unor subprobleme de optimizare distincte.
+	\item \textbf{ALS (NNLS Manual):} Cel mai lent. Fiecare iterație a buclei principale ALS necesită rezolvarea a $m+n$ subprobleme NNLS. Deoarece fiecare subproblemă NNLS este rezolvată printr-un algoritm iterativ (proiectarea gradientului), costul computațional total este semnificativ mai mare. Timpul de execuție este direct influențat de \texttt{max\_iter\_als}, \texttt{max\_iter\_nnls} și de eficiența implementării NNLS. Parametrii aleși în experimentele noastre au vizat un compromis pentru a permite finalizarea într-un timp rezonabil.
 \end{itemize}
 
 \subsection{Concluzii specifice metodelor}
-% ... (actualizează pentru a reflecta performanța ALS) ...
 \begin{itemize}
-\item Toate cele trei metode de factorizare cu constrângeri de non-negativitate reușesc să descompună matricea și să genereze factori latenti utilizabili pentru recomandări.
-\item Implementările optimizate (precum \texttt{sklearn}) oferă un echilibru bun între performanță și viteză.
-\item Implementarea ALS cu NNLS manual, deși demonstrează o abordare alternativă de optimizare iterativă a subproblemelor cu constrângeri, a prezentat o eroare de reconstrucție mai mare în configurația testată. Acest lucru subliniază importanța crucială a alegerii corecte a parametrilor pentru subproblemele NNLS (în special rata de învățare și numărul de iterații) pentru performanța generală a ALS. O ajustare fină a acestor parametri ar putea îmbunătăți rezultatele.
-\item NMF și ALS descoperă similarități latente între melodii, nu doar pe baza tagurilor explicite, ceea ce poate duce la recomandări mai surprinzătoare și diverse.
+	\item Metodele NMF (atât implementarea manuală multiplicativă, cât și cea din \texttt{sklearn}) au demonstrat capacitatea de a reduce eroarea de reconstrucție la valori comparabile, \texttt{sklearn} fiind marginal superior și mai rapid.
+	\item Implementarea ALS cu NNLS manual a prezentat o eroare de reconstrucție considerabil mai mare în configurația testată. Acest rezultat subliniază provocările asociate cu implementarea manuală a algoritmilor de optimizare iterativi imbricați, în special sensibilitatea la hiperparametri precum rata de învățare și numărul de iterații pentru subproblemele NNLS. Deși ALS este o metodă puternică, performanța sa aici a fost limitată de eficiența și convergența solver-ului NNLS manual. Alegerea parametrilor a fost un compromis pentru a asigura finalizarea execuției într-un interval de timp acceptabil pentru testare.
+	\item Toate metodele de factorizare generează profiluri latente care pot fi utilizate pentru recomandări, dar calitatea acestora (și, implicit, a recomandărilor) este corelată cu capacitatea metodei de a minimiza eroarea de reconstrucție.
 \end{itemize}
 
 \section{Comparare cu alte funcții Python}
