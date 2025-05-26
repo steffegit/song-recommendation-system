@@ -1,125 +1,224 @@
 \documentclass[12pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
-\usepackage{amsmath, amssymb}
+\usepackage{amsmath, amssymb, amsthm} 
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{geometry}
+\usepackage{listings} 
+
 \geometry{margin=2.5cm}
 
-\title{Sistem de recomandare folosind factorizare de matrice (NMF) și similaritate pe taguri}
+\lstset{
+	language=Python,
+	basicstyle=\ttfamily\footnotesize,
+	keywordstyle=\color{blue},
+	commentstyle=\color{green!40!black},
+	stringstyle=\color{purple},
+	showstringspaces=false,
+	breaklines=true,
+	frame=single,
+	numbers=left,
+	numberstyle=\tiny\color{gray}
+}
+
+\title{Sistem de recomandare folosind factorizare de matrice și similaritate pe taguri}
 \author{Gatej Stefan-Alexandru, Potop Horia-Ioan}
 \date{\today}
 
 \begin{document}
 	
 	\maketitle
+	\tableofcontents
+	\newpage
 	
 	\section{Descrierea aplicației}
 	
-	Scopul acestei componente este de a recomanda melodii similare pe baza tagurilor asociate fiecărei piese muzicale. Problema se modelează ca o problemă de optimizare cu constrângeri: factorizarea non-negativă a unei matrice binare (melodie $\times$ tag).
+	Scopul acestei componente a sistemului de recomandare este de a genera recomandări de melodii similare pe baza caracteristicilor extrase din tagurile asociate fiecărei piese muzicale. Problema centrală abordată este factorizarea unei matrice binare (melodie $\times$ tag) într-un spațiu latent de dimensiune redusă, sub constrângeri de non-negativitate. Această factorizare permite descoperirea unor structuri și similarități ascunse între melodii.
 	
-	\section{Formularea matematică a problemei}
+	\section{Formularea matematică a problemei de factorizare}
 	
-	Fie $V \in \mathbb{R}^{m \times n}$ matricea binară ce indică asocierea dintre $m$ melodii și $n$ taguri. Dorim să găsim două matrice $W \in \mathbb{R}^{m \times r}$ și $H \in \mathbb{R}^{r \times n}$, cu $W \geq 0$, $H \geq 0$, astfel încât:
+	Problema de bază pentru metodele de factorizare de matrice (NMF, ALS-NNLS) este următoarea:
+	Fie $V \in \mathbb{R}^{m \times n}$ matricea de intrare (în cazul nostru, matricea binară melodie $\times$ tag), unde $m$ este numărul de melodii și $n$ este numărul de taguri unice. Dorim să găsim două matrice, $W \in \mathbb{R}^{m \times r}$ (matricea factorilor latenti pentru melodii) și $H \in \mathbb{R}^{r \times n}$ (matricea factorilor latenti pentru taguri), unde $r \ll \min(m,n)$ este dimensiunea spațiului latent (numărul de factori).
+	
+	Problema de optimizare este de a minimiza eroarea de reconstrucție, adesea măsurată prin norma Frobenius:
 	
 	\begin{equation}
-		\min_{W \geq 0, H \geq 0} \| V - W H \|_F^2
+		\min_{W, H} \| V - W H \|_F^2
+		\label{eq:nmf_objective_main} % Am schimbat label-ul pentru unicitate
 	\end{equation}
 	
-	\textbf{Constrângeri:}
+	\textbf{Constrângeri de Non-Negativitate:}
+	Pentru a asigura interpretabilitatea factorilor și pentru a se alinia cu natura aditivă a multor date (cum ar fi prezența tagurilor), se impun constrângeri de non-negativitate:
 	\begin{itemize}
-		\item $W_{ij} \geq 0$
-		\item $H_{ij} \geq 0$
+		\item $W_{ij} \geq 0$ pentru toți $i,j$
+		\item $H_{ij} \geq 0$ pentru toți $i,j$
 	\end{itemize}
 	
-	\subsection*{Concepte cheie: Profil latent și Cluster latent}
+	\subsection{Alegerea numărului de factori latenti ($r$)}
+	\label{subsec:alegerea_r}
 	
-	\paragraph{Profil latent}
-	Un profil latent este o reprezentare numerică, invizibilă direct, a unei entități (de exemplu, o melodie sau un utilizator) într-un spațiu de factori ascunși (latenti). Acești factori nu sunt direct observați în datele inițiale (cum ar fi tagurile sau genurile), ci sunt descoperiți automat de algoritmul de factorizare (NMF). Fiecare melodie va avea un vector de factori latenti (profil latent), de exemplu: $[0.2, 1.5, 0.0, 0.7, ...]$. Acești factori pot corespunde unor teme, stiluri sau combinații de caracteristici pe care algoritmul le-a identificat ca fiind relevante, dar care nu au neapărat o interpretare clară.
+	Numărul de factori latenti, $r$, este un hiperparametru crucial în algoritmii de factorizare de matrice, deoarece determină dimensionalitatea spațiului latent în care datele sunt proiectate. O valoare prea mică pentru $r$ poate duce la un model sub-antrenat (underfitting) care nu capturează suficientă informație din datele originale, rezultând într-o eroare de reconstrucție mare și recomandări de calitate inferioară. Pe de altă parte, o valoare prea mare pentru $r$ poate duce la supra-antrenare (overfitting), unde modelul începe să memoreze zgomotul specific setului de date de antrenament și nu generalizează bine pe date noi. De asemenea, un $r$ mare crește complexitatea computațională a antrenării și a utilizării modelului.
 	
-	\paragraph{Cluster latent}
-	Un cluster latent este un grup de entități (melodii, utilizatori etc.) care au profiluri latente similare, adică sunt apropiate în spațiul factorilor latenti. Acest cluster poate corespunde, de exemplu, unui anumit gen muzical, unui anumit artist sau unui tipar de preferințe pe care algoritmul l-a descoperit, chiar dacă nu există un tag explicit pentru acel grup.
+	În cadrul acestui proiect, pentru a permite o comparație directă și consistentă între diferitele metode de factorizare implementate (NMF Multiplicativ, NMF \texttt{sklearn}, ALS-NNLS), am optat pentru o valoare fixă $r = 10$. Această valoare a fost aleasă ca un punct de pornire rezonabil pentru a demonstra funcționalitatea algoritmilor pe setul de date disponibil, permițând în același timp timpi de execuție gestionabili, în special pentru implementările manuale care sunt mai intensive computațional.
 	
-	\vspace{0.5em}
-	\textit{Pe scurt: Profilul latent este vectorul de factori ascunși care descrie o melodie/utilizator, iar un cluster latent este un grup de melodii/utilizatori cu profiluri latente similare.}
-	\vspace{1em} % Adaugă un spațiu vertical mai mare după explicație
+	Într-o aplicație practică sau într-un studiu mai aprofundat, selectarea optimă a lui $r$ ar necesita o abordare mai sistematică, implicând experimentarea cu o gamă de valori pentru $r$ și evaluarea performanței modelului folosind metrici adecvate. Metodele comune includ:
+	\begin{itemize}
+		\item \textbf{Monitorizarea erorii de reconstrucție:} Se analizează cum evoluează eroarea de reconstrucție (de ex., norma Frobenius a diferenței $V - WH$) pe măsură ce $r$ crește. Se caută adesea un punct de inflexiune ("cot" sau "elbow point") în graficul erorii vs. $r$, dincolo de care adăugarea de noi factori nu mai aduce o reducere semnificativă a erorii.
+		\item \textbf{Metrici de evaluare specifice sarcinii:} Dacă scopul final este recomandarea și sunt disponibile date de feedback ale utilizatorilor (ex: ratinguri, istoric de ascultare), se pot utiliza metrici de ranking precum Precision@k, Recall@k, NDCG (Normalized Discounted Cumulative Gain) sau MAP (Mean Average Precision) pe un set de date de validare sau test. Valoarea lui $r$ care maximizează aceste metrici ar fi preferată.
+		\item \textbf{Stabilitatea factorizării:} Se poate evalua cât de stabile sunt factorizările obținute pentru aceeași valoare $r$ la rulări multiple cu inițializări aleatorii diferite. O stabilitate mai mare este de dorit.
+		\item \textbf{Interpretabilitatea factorilor:} În unele aplicații, se preferă un $r$ care produce factori latenti (coloanele lui $W$ sau liniile lui $H$) care au o interpretare semantică clară și relevantă pentru experții în domeniu.
+	\end{itemize}
+	Pentru scopurile acestei lucrări, ne-am concentrat pe compararea fundamentală a algoritmilor de optimizare cu constrângeri pentru un $r$ fix, recunoscând că optimizarea detaliată a acestui hiperparametru este un pas important, dar distinct, într-un scenariu de dezvoltare a unui sistem de recomandare de producție.
 	
-	\section{Soluția implementată}
-	
-	Am implementat două metode pentru rezolvarea problemei:
-	
-	\subsection{Algoritmul multiplicativ pentru NMF}
+	\subsection{Rolul matricelor $W$ și $H$ în sistemul de recomandare}
+	În urma procesului de factorizare, obținem două matrice, $W$ și $H$, care au interpretări și utilizări distincte în contextul recomandărilor:
 	
 	\begin{itemize}
-		\item Algoritm iterativ ce actualizează alternativ $W$ și $H$ folosind reguli multiplicative.
-		\item Rapid și eficient pentru matrice mari.
-	\end{itemize}
-	
-	\subsection{NMF din scikit-learn (\texttt{sklearn.decomposition.NMF})}
-	
-	\begin{itemize}
-		\item Implementare optimizată ce folosește coordinate descent.
-		\item Oferă rezultate robuste și convergență rapidă.
-	\end{itemize}
-	
-	\subsection*{Fragment de cod}
-	
-	\begin{verbatim}
-		def nmf_multiplicative(V, r, max_iter=100, tol=1e-4):
-		m, n = V.shape
-		np.random.seed(42)
-		W = np.abs(np.random.randn(m, r))
-		H = np.abs(np.random.randn(r, n))
-		for it in range(max_iter):
-		H *= (W.T @ V) / (W.T @ (W @ H) + 1e-10)
-		W *= (V @ H.T) / ((W @ H) @ H.T + 1e-10)
-		return W, H
+		\item \textbf{Matricea $W \in \mathbb{R}^{m \times r}$ (Melodii $\times$ Factori Latenți):} Fiecare linie $W_i$ din această matrice reprezintă \textbf{profilul latent} al melodiei $i$. Acest vector $r$-dimensional încorporează caracteristicile "ascunse" ale melodiei, așa cum au fost ele învățate de algoritm. Pentru recomandările de tip melodie-melodie, așa cum sunt implementate în acest proiect, similaritatea dintre aceste profiluri latente (de exemplu, similaritatea cosinus între $W_i$ și $W_j$) este utilizată pentru a identifica melodii similare. Astfel, $W$ este matricea principală utilizată direct în funcția de generare a recomandărilor.
 		
-		from sklearn.decomposition import NMF
-		model = NMF(n_components=10, init='random', random_state=42, max_iter=100)
-		W_sklearn = model.fit_transform(track_tag_matrix)
-		H_sklearn = model.components_
-	\end{verbatim}
-	
-	\section{Rezultate numerice și concluzii}
-	
-	\subsection{Erori de reconstrucție}
-	
-	\begin{itemize}
-		\item \textbf{Multiplicative NMF:} 337.03
-		\item \textbf{sklearn NMF:} 336.42
+		\item \textbf{Matricea $H \in \mathbb{R}^{r \times n}$ (Factori Latenți $\times$ Taguri):} Această matrice leagă factorii latenti de tagurile originale. Fiecare coloană $H_j$ poate fi interpretată ca profilul latent al tagului $j$, iar fiecare linie $H_k$ arată importanța sau "încărcătura" factorului latent $k$ pentru fiecare tag original. Matricea $H$ este crucială pentru:
+		\begin{itemize}
+			\item \textbf{Interpretarea factorilor latenți:} Analizând liniile lui $H$, putem încerca să dăm un sens semantic fiecărui factor latent (ex: un factor ar putea fi puternic asociat cu taguri de "rock clasic", altul cu "muzică electronică ambientală").
+			\item \textbf{Recomandarea de taguri pentru melodii:} Produsul $W_i H$ poate fi folosit pentru a prezice relevanța tagurilor pentru melodia $i$.
+		\item \textbf{Găsirea de taguri similare:} Similaritatea dintre coloanele lui $H$ poate identifica taguri care sunt conceptual apropiate în spațiul latent.
+	\item \textbf{Calitatea factorizării:} Ambele matrice, $W$ și $H$, sunt esențiale pentru reconstrucția $V \approx WH$ și, implicit, pentru calitatea generală a modelului.
 	\end{itemize}
-	
-	\subsection{Recomandări generate}
-	
-	\begin{itemize}
-		\item \textbf{Tag similarity:} Recomandă melodii cu taguri identice/similare.
-		\item \textbf{NMF multiplicativă:} Recomandă melodii cu profil latent apropiat, nu neapărat cu aceleași taguri.
-		\item \textbf{NMF (sklearn):} Recomandă melodii din același cluster latent (ex: toate piesele unui artist).
-	\end{itemize}
-	
-	\subsection{Timp de execuție}
-	
-	Algoritmul multiplicativ și sklearn NMF rulează rapid (câteva secunde pentru setul de date testat).
-	
-	\subsection{Concluzii}
-	
-	\begin{itemize}
-		\item Ambele metode de NMF oferă rezultate similare ca eroare de reconstrucție.
-		\item NMF descoperă similarități latente între melodii, nu doar pe baza tagurilor explicite.
-		\item Recomandările pe factori latenti pot fi mai relevante pentru utilizator decât cele bazate strict pe taguri.
-	\end{itemize}
-	
-	\section{Comparare cu alte funcții Python}
-	
-	Pentru această problemă, funcțiile \texttt{scipy.optimize.minimize} nu sunt potrivite direct, deoarece nu pot gestiona eficient constrângeri de non-negativitate pe matrice mari (ar fi fost extrem de lent). NMF din \texttt{sklearn} este optimizată pentru această clasă de probleme și oferă rezultate competitive cu algoritmul multiplicativ clasic.
-	
-	\section{Bibliografie}
-	
-	\begin{itemize}
-		\item Lee, D. D., \& Seung, H. S. (2001). Algorithms for non-negative matrix factorization. Advances in neural information processing systems, 13.
-		\item \url{https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.NMF.html}
-		\item \url{https://en.wikipedia.org/wiki/Non-negative_matrix_factorization}
-	\end{itemize}
-	
+\end{itemize}
+Deși funcția noastră principală de recomandare utilizează direct matricea $W$, matricea $H$ este o componentă indispensabilă a procesului de învățare și oferă posibilități valoroase de analiză și extindere a sistemului.
+
+\subsection*{Concepte cheie: Profil latent și Cluster latent}
+
+\paragraph{Profil latent}
+Un profil latent este o reprezentare numerică (un vector) a unei entități (de exemplu, o melodie) în spațiul de factori ascunși de dimensiune $r$, descoperit de algoritmul de factorizare. Liniile matricei $W$ (adică $W_i$) reprezintă aceste profiluri latente pentru melodii. Acești factori nu sunt direct observați în datele inițiale, ci sunt învățați pentru a surprinde structuri subiacente. De exemplu, un factor ar putea corespunde unui "grad de energie" al melodiei, altul unui "stil vocal specific", etc., chiar dacă aceste concepte nu sunt taguri explicite.
+
+\paragraph{Cluster latent}
+Un cluster latent se referă la un grup de entități (melodii) care au profiluri latente similare, adică sunt apropiate în spațiul latent $r$-dimensional. Deși nu aplicăm explicit un algoritm de clustering separat după NMF/ALS în această componentă pentru a defini clustere discrete, ideea este că melodiile cu vectori $W_i$ similari sunt considerate conceptual parte dintr-un "cluster" sau o regiune densă în spațiul latent. Recomandările se bazează pe această proximitate.
+
+\vspace{0.5em}
+\textit{Pe scurt: Profilul latent este vectorul de factori ascunși care descrie o melodie, iar similaritatea dintre aceste profiluri stă la baza recomandărilor bazate pe factorizare.}
+\vspace{1em} 
+
+\section{Soluții implementate pentru factorizarea cu constrângeri}
+
+Am implementat și comparat trei algoritmi pentru rezolvarea problemei de factorizare de matrice cu constrângeri de non-negativitate:
+
+\subsection{Algoritmul multiplicativ pentru NMF (NMF-MULT)}
+Acesta este un algoritm clasic pentru NMF, propus de Lee și Seung. El actualizează iterativ matricele $W$ și $H$ folosind următoarele reguli multiplicative, care garantează non-creșterea funcției obiectiv (\ref{eq:nmf_objective_main}) și menținerea non-negativității:
+\begin{align}
+H_{kj} &\leftarrow H_{kj} \frac{(W^T V)_{kj}}{(W^T W H + \epsilon)_{kj}} \\
+W_{ik} &\leftarrow W_{ik} \frac{(V H^T)_{ik}}{(W H H^T + \epsilon)_{ik}}
+\end{align}
+unde $\epsilon$ este o constantă mică pentru a evita diviziunea cu zero.
+\begin{itemize}
+\item \textbf{Avantaje:} Simplu de implementat, relativ rapid pentru multe seturi de date.
+\item \textbf{Dezavantaje:} Poate converge lent și la minime locale.
+\end{itemize}
+
+\subsection{NMF din scikit-learn (\texttt{sklearn.decomposition.NMF})}
+Am utilizat implementarea NMF din biblioteca \texttt{scikit-learn}, care oferă mai mulți solveri. Am ales solver-ul 'cd' (Coordinate Descent), care este eficient și adesea converge mai rapid decât regulile multiplicative simple pentru anumite tipuri de date, minimizând aceeași funcție obiectiv (\ref{eq:nmf_objective_main}) sub constrângeri de non-negativitate.
+\begin{itemize}
+\item \textbf{Avantaje:} Implementare optimizată, robustă, cu opțiuni pentru regularizare.
+\item \textbf{Solver:} Coordinate Descent actualizează fiecare element dintr-o matrice (ținând cealaltă fixă) rezolvând o subproblemă de optimizare univariată.
+\end{itemize}
+
+\subsection{Alternating Least Squares cu Non-Negative Least Squares (ALS-NNLS)}
+ALS este o altă abordare populară pentru factorizarea de matrice. Algoritmul optimizează alternativ pentru $W$ (ținând $H$ fix) și apoi pentru $H$ (ținând $W$ fix), minimizând funcția obiectiv (\ref{eq:nmf_objective_main}) la fiecare pas. Fiecare subproblemă devine o problemă de least squares. Pentru a impune constrângerile de non-negativitate, fiecare subproblemă de least squares este rezolvată ca o problemă de Non-Negative Least Squares (NNLS).
+\begin{itemize}
+\item \textbf{Subproblema pentru $W$ (pentru fiecare linie $W_i$):}
+$$ \min_{W_i \ge 0} \| V_i - W_i H \|_F^2 $$
+\item \textbf{Subproblema pentru $H$ (pentru fiecare coloană $H_j$):} % Corectat: H_j este coloană
+$$ \min_{H_{\cdot j} \ge 0} \| V_{\cdot j} - W H_{\cdot j} \|_F^2 $$ 
+% Notație: H_.j pentru coloana j a lui H, V_.j pentru coloana j a lui V
+\end{itemize}
+Am implementat manual atât logica ALS, cât și un solver NNLS bazat pe metoda proiectării gradientului.
+\paragraph{NNLS Manual (Proiectarea Gradientului):}
+Pentru a rezolva $\min_{x \ge 0} \|Ax - b\|_2^2$:
+\begin{enumerate}
+\item Se inițializează $x \ge 0$.
+\item Se calculează gradientul funcției obiectiv $\frac{1}{2}\|Ax - b\|_2^2$: $\nabla_x = A^T (Ax - b)$.
+\item Se face un pas în direcția opusă gradientului: $x \leftarrow x - \eta \nabla_x$.
+\item Se proiectează $x$ înapoi pe domeniul fezabil: $x_j \leftarrow \max(0, x_j)$.
+\item Se repetă pașii 2-4 până la convergență.
+\end{enumerate}
+\begin{itemize}
+\item \textbf{Avantaje:} Demonstrează înțelegerea detaliată a optimizării cu constrângeri și a descompunerii problemei.
+\item \textbf{Dezavantaje:} Implementarea manuală (mai ales NNLS) poate fi lentă și sensibilă la parametrii precum rata de învățare.
+\end{itemize}
+
+\section{Rezultate numerice și concluzii}
+
+\subsection{Erori de reconstrucție}
+Pentru un număr de factori latenti $r=10$, erorile de reconstrucție (norma Frobenius $\|V - WH\|_F$) obținute au fost:
+\begin{itemize}
+\item \textbf{NMF Multiplicativ (Manual):} 337.03
+\item \textbf{NMF (sklearn, solver 'cd'):} 336.42
+\item \textbf{ALS (NNLS Manual):} 430.48
+\end{itemize}
+Se observă că implementarea din \texttt{sklearn} obține o eroare de reconstrucție puțin mai mică, probabil datorită optimizărilor interne și a robusteții solver-ului Coordinate Descent. Algoritmul multiplicativ obține rezultate comparabile. Implementarea ALS-NNLS manuală prezintă o eroare semnificativ mai mare, indicând posibile probleme de convergență în subproblemele NNLS manuale, în special legate de alegerea ratei de învățare și a numărului de iterații pentru solver-ul de proiectare a gradientului.
+
+\subsection{Recomandări generate (Exemplu)}
+% ... (secțiunea de recomandări rămâne similară, asigură-te că ai exemple și pentru ALS) ...
+Pentru piesa de referință "Opening - Linkin Park":
+\begin{itemize}
+\item \textbf{Tag similarity (Baseline):}
+\begin{itemize}
+\item Celestial - P.O.D.
+\item Arto - System of a Down
+\item Session - Linkin Park
+\end{itemize}
+\item \textbf{NMF Multiplicativă:}
+\begin{itemize}
+\item What Love - Moby
+\item Lucky You - Deftones
+\item Krwlng - Linkin Park
+\end{itemize}
+\item \textbf{NMF (sklearn):}
+\begin{itemize}
+\item What Love - Moby
+\item City on a Hill - Genghis Tron
+\item Wish - Nine Inch Nails
+\end{itemize}
+\item \textbf{ALS (NNLS Manual):} 
+% TODO: Rulează codul și adaugă exemple de recomandări pentru ALS
+% Dacă eroarea e mare, recomandările pot fi mai puțin relevante.
+\begin{itemize}
+\item [Exemplu melodie ALS 1 - posibil mai puțin relevantă din cauza erorii]
+\item [Exemplu melodie ALS 2]
+\item [Exemplu melodie ALS 3]
+\end{itemize}
+\end{itemize}
+Recomandările bazate pe factorizare (NMF, ALS) tind să identifice similarități latente. Calitatea recomandărilor ALS-NNLS este direct influențată de performanța sa în minimizarea erorii de reconstrucție.
+
+\subsection{Timp de execuție (Observații calitative)}
+% ... (rămâne la fel) ...
+\begin{itemize}
+\item \textbf{NMF (sklearn):} Cel mai rapid, datorită implementării optimizate.
+\item \textbf{NMF Multiplicativ (Manual):} Relativ rapid, dar poate necesita mai multe iterații pentru convergență fină.
+\item \textbf{ALS (NNLS Manual):} Cel mai lent, deoarece fiecare iterație ALS implică multiple rezolvări ale subproblemelor NNLS, care sunt ele însele iterative și implementate manual. Timpul este sensibil la numărul de iterații și rata de învățare alese pentru NNLS.
+\end{itemize}
+
+\subsection{Concluzii specifice metodelor}
+% ... (actualizează pentru a reflecta performanța ALS) ...
+\begin{itemize}
+\item Toate cele trei metode de factorizare cu constrângeri de non-negativitate reușesc să descompună matricea și să genereze factori latenti utilizabili pentru recomandări.
+\item Implementările optimizate (precum \texttt{sklearn}) oferă un echilibru bun între performanță și viteză.
+\item Implementarea ALS cu NNLS manual, deși demonstrează o abordare alternativă de optimizare iterativă a subproblemelor cu constrângeri, a prezentat o eroare de reconstrucție mai mare în configurația testată. Acest lucru subliniază importanța crucială a alegerii corecte a parametrilor pentru subproblemele NNLS (în special rata de învățare și numărul de iterații) pentru performanța generală a ALS. O ajustare fină a acestor parametri ar putea îmbunătăți rezultatele.
+\item NMF și ALS descoperă similarități latente între melodii, nu doar pe baza tagurilor explicite, ceea ce poate duce la recomandări mai surprinzătoare și diverse.
+\end{itemize}
+
+\section{Comparare cu alte funcții Python}
+% ... (rămâne la fel) ...
+Pentru problema de factorizare non-negativă, funcțiile generice de optimizare cu constrângeri din \texttt{scipy.optimize.minimize} (ex: cu solver-ul 'SLSQP' sau 'L-BFGS-B' cu bounds) ar putea fi teoretic aplicate. Totuși, acestea ar necesita "aplatizarea" matricelor $W$ și $H$ într-un singur vector de variabile, ceea ce ar duce la un număr foarte mare de variabile ($m \times r + r \times n$). Pentru astfel de probleme la scară mare cu structură specifică (factorizare de matrice), algoritmii dedicați precum NMF multiplicativ, Coordinate Descent (din \texttt{sklearn}), sau ALS sunt semnificativ mai eficienți. Am ales să implementăm ALS cu NNLS manual ca o altă metodă specifică problemei, dar care ilustrează optimizarea iterativă a subproblemelor cu constrângeri.
+
+\section{Bibliografie}
+% ... (rămâne la fel, poate adaugi o referință specifică pentru ALS dacă găsești una bună) ...
+\begin{itemize}
+\item Lee, D. D., \& Seung, H. S. (2001). Algorithms for non-negative matrix factorization. \textit{Advances in neural information processing systems, 13}.
+\item Chih-Jen Lin. (2007). Projected Gradient Methods for Non-negative Matrix Factorization. \textit{Neural Computation, 19(10)}, 2756-2779. (Referință pentru metode de gradient pentru NMF/NNLS)
+\item Zdunek, R., \& Cichocki, A. (2007). Non-negative matrix factorization with quadratic programming. \textit{Computers \& Mathematics with Applications, 54(1)}, 70-83. (Discută despre NNLS în context NMF)
+\item \url{https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.NMF.html}
+\item \url{https://en.wikipedia.org/wiki/Non-negative_matrix_factorization}
+\item \url{https://en.wikipedia.org/wiki/Alternating_least_squares}
+\end{itemize}
+
 \end{document}
