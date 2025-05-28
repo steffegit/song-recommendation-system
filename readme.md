@@ -6,7 +6,7 @@
 
 ## 📄 Documentation
 
-📝 [**View Full Project Documentation (PDF)**](docs/documentation.pdf)
+📝 [**View Full Project Documentation (PDF)**](docs/document.pdf)
 
 ---
 
