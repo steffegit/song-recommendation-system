@@ -111,8 +111,9 @@ def solve_nnls_manual(X, target, durations, max_iter=20, tol=1e-5):
     
     return w, loss_history
 
-# Solver: PGD
-def solve_pgd(X, target, durations, lr=0.1, max_iter=500, tol=1e-6):
+# Solver: PGD //
+
+def solve_pgd(X, target, durations, lr=0.01, max_iter=500, tol=1e-6):
     def obj_and_grad(w):
         w = np.clip(w, 0, 1)
         w /= (w.sum() + 1e-8)
@@ -415,6 +416,10 @@ def create_optimal_playlist(X, target_idx, durations, solver_fn=None):
 
 if __name__ == "__main__":
     X, metadata, artists, durations = load_data()
+    sigma_max = np.linalg.norm(X, 2)        # ||X||_2
+    L = sigma_max**2                        # ≃ Lipschitz constant
+    lr = 1.0 / L
+    print(f"Estimated Lipschitz constant L = {L:.6f}, setting lr = 1/L = {lr:.6f}")
     
     # Modified main menu with playlist creation option
     print("=== Music Playlist Creator ===")
